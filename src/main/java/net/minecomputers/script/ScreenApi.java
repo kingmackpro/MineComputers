@@ -61,6 +61,8 @@ final class ScreenApi {
             case "pixel" -> t.setPixel(num(a), num(b), num(c));
             case "rect" -> t.fillRect(num(a), num(b), num(c), num(d), num(e));
             case "line" -> t.drawLine(num(a), num(b), num(c), num(d), num(e));
+            case "video" -> origin.playVideo(String.valueOf(a), num(b) != 0);
+            case "stopvideo" -> origin.stopVideo();
             case "pw" -> {
                 return t.pixelW();
             }
@@ -70,6 +72,18 @@ final class ScreenApi {
             default -> throw new IllegalArgumentException("Unknown screen operation: " + op);
         }
         return null;
+    }
+
+    /** The script stopped: take any video off this screen. */
+    static void releaseAll(GlobalPos device) {
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        ServerLevel level = server == null ? null : server.getLevel(device.dimension());
+        if (level != null && level.isLoaded(device.pos())) {
+            ScreenBlockEntity origin = ScreenBlockEntity.originAt(level, device.pos());
+            if (origin != null) {
+                origin.stopVideo();
+            }
+        }
     }
 
     private static String text(Object o) {

@@ -49,6 +49,20 @@ val ponderVersion = "1.0.82"
 val flywheelVersion = "1.0.6"
 val registrateVersion = "MC1.21-1.3.0+67"
 
+// JavaCV's own jar has a module descriptor that requires OpenCV, librealsense and a dozen other native modules
+// that we do not ship (the game then refuses to start: "Module org.bytedeco.librealsense not found").
+// So we repack the jar without module-info: it becomes a plain library that only needs what we use (FFmpeg).
+val javacvSource = configurations.detachedConfiguration(
+    (dependencies.create("org.bytedeco:javacv:1.5.10") as ModuleDependency).also { it.isTransitive = false }
+)
+val javacvPlain = tasks.register<Zip>("javacvPlain") {
+    from(zipTree(javacvSource.singleFile)) {
+        exclude("module-info.class", "META-INF/versions/**", "META-INF/*.SF", "META-INF/*.RSA", "META-INF/*.DSA")
+    }
+    archiveFileName.set("javacv-plain.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("javacv"))
+}
+
 dependencies {
     // GraalJS runs the in-game JavaScript (milestone 2).
     // NeoForge needs the libraries on BOTH the compile classpath and the runtime classpath,
@@ -62,6 +76,36 @@ dependencies {
     // String form: the plugin doesn't generate a type-safe Kotlin accessor for this configuration.
     "additionalRuntimeClasspath"("org.graalvm.polyglot:polyglot:$graalVersion")
     "additionalRuntimeClasspath"("org.graalvm.js:js-language:$graalVersion")
+
+    // JLayer: pure Java MP3 decoder for the Speaker (client side). Same two lines as GraalJS: compile + runtime.
+    // Not bundled into the mod jar yet (jar-in-jar is still to do for GraalJS as well).
+    implementation("javazoom:jlayer:1.0.1")
+    "additionalRuntimeClasspath"("javazoom:jlayer:1.0.1")
+
+    // FFmpeg (JavaCV) for video and for every audio format except MP3 (client side).
+    // javacv itself is non-transitive on purpose: its default dependencies pull in OpenCV and more (hundreds of MB).
+    // Natives: Linux, Windows and macOS (Apple silicon). For release, jar-in-jar them with GraalJS and JLayer.
+    val javacppVersion = "1.5.10"
+    val ffmpegVersion = "6.1.1-$javacppVersion"
+    implementation(files(javacvPlain))
+    implementation("org.bytedeco:javacpp:$javacppVersion")
+    implementation("org.bytedeco:ffmpeg:$ffmpegVersion")
+    "additionalRuntimeClasspath"(files(javacvPlain))
+    "additionalRuntimeClasspath"("org.bytedeco:javacpp:$javacppVersion")
+    "additionalRuntimeClasspath"("org.bytedeco:ffmpeg:$ffmpegVersion")
+    // Development: only Linux natives (fewer jars on the module path). For a release build run Gradle with
+    // -PallPlatforms to add Windows and macOS.
+    val nativePlatforms = if (project.hasProperty("allPlatforms")) {
+        listOf("linux-x86_64", "windows-x86_64", "macosx-arm64")
+    } else {
+        listOf("linux-x86_64")
+    }
+    for (platform in nativePlatforms) {
+        runtimeOnly("org.bytedeco:javacpp:$javacppVersion:$platform")
+        runtimeOnly("org.bytedeco:ffmpeg:$ffmpegVersion:$platform")
+        "additionalRuntimeClasspath"("org.bytedeco:javacpp:$javacppVersion:$platform")
+        "additionalRuntimeClasspath"("org.bytedeco:ffmpeg:$ffmpegVersion:$platform")
+    }
 
     // Create: the Servo is a Create kinetic block (it turns a shaft).
     implementation("com.simibubi.create:create-1.21.1:$createVersion:slim") {

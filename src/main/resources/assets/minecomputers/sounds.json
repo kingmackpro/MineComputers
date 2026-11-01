@@ -1,0 +1,7 @@
+{
+  "media": {
+    "sounds": [
+      { "name": "minecraft:note/harp", "stream": true, "attenuation_distance": 32 }
+    ]
+  }
+}

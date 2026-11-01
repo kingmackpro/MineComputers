@@ -2,8 +2,10 @@ package net.minecomputers.registry;
 
 import net.minecomputers.MineComputers;
 import net.minecomputers.block.entity.BrainBlockEntity;
+import net.minecomputers.block.entity.RedstoneLinkBlockEntity;
 import net.minecomputers.block.entity.ScreenBlockEntity;
 import net.minecomputers.block.entity.ServoBlockEntity;
+import net.minecomputers.block.entity.SpeakerBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -24,6 +26,14 @@ public final class ModBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ServoBlockEntity>> SERVO =
             BLOCK_ENTITIES.register("servo",
                     () -> BlockEntityType.Builder.of(ServoBlockEntity::new, ModBlocks.SERVO.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RedstoneLinkBlockEntity>> REDSTONE_LINK =
+            BLOCK_ENTITIES.register("redstone_link",
+                    () -> BlockEntityType.Builder.of(RedstoneLinkBlockEntity::new, ModBlocks.REDSTONE_LINK.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SpeakerBlockEntity>> SPEAKER =
+            BLOCK_ENTITIES.register("speaker",
+                    () -> BlockEntityType.Builder.of(SpeakerBlockEntity::new, ModBlocks.SPEAKER.get()).build(null));
 
     private ModBlockEntities() {
     }

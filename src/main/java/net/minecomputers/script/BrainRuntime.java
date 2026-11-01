@@ -126,6 +126,8 @@ public final class BrainRuntime {
                   device.fillRect = (x, y, w, h, c) => s('rect', n(x), n(y), n(w), n(h), px(c));
                   device.drawLine = (x0, y0, x1, y1, c) => s('line', n(x0), n(y0), n(x1), n(y1), px(c));
                   device.getPixelSize = () => [s('pw'), s('ph')];
+                  device.playVideo = (path, loop) => s('video', String(path), loop ? 1 : 0);
+                  device.stopVideo = () => s('stopvideo');
                 } else if (type === 'servo') {
                   const v = (op, a, b) => host.servo(key, op, a, b);
                   const n = (x) => Number(x);
@@ -138,6 +140,24 @@ public final class BrainRuntime {
                   device.getTarget = () => v('gettarget');
                   device.isMoving = () => v('moving');
                   device.isPowered = () => v('powered');
+                } else if (type === 'speaker') {
+                  const sp = (op, a, b, c) => host.speaker(key, op, a, b, c);
+                  const opt = (x) => (x === undefined || x === null ? null : Number(x));
+                  device.play = (sound, volume, pitch) => sp('play', String(sound), opt(volume), opt(pitch));
+                  device.playFile = (path, volume, loop) => sp('file', String(path), opt(volume), loop ? 1 : 0);
+                  device.stopFile = () => sp('stopfile');
+                  device.isPowered = () => sp('powered');
+                } else if (type === 'redstone') {
+                  const r = (op, a, b, c) => host.redstone(key, op, a, b, c);
+                  const n = (x) => Number(x);
+                  const item = (x) => (x === undefined || x === null ? '' : String(x));
+                  device.linkCount = 8;
+                  device.setFrequency = (link, first, second) => r('freq', n(link), item(first), item(second));
+                  device.getFrequency = (link) => [r('getfreq', n(link), 0), r('getfreq', n(link), 1)];
+                  device.setSignal = (link, strength) => r('signal', n(link), n(strength));
+                  device.getSignal = (link) => r('getsignal', n(link));
+                  device.clearLink = (link) => r('clear', n(link));
+                  device.isPowered = () => r('powered');
                 }
                 return device;
               };
@@ -186,6 +206,8 @@ public final class BrainRuntime {
     private final Map<String, String> devices;
     /** Device ID to the position of the device's block (for a Screen: its origin block), for the script API. */
     private final Map<String, GlobalPos> positions;
+    /** Media path ("media/song.mp3") to its id in the media store. */
+    private Map<String, String> mediaIds = Map.of();
     private final List<Value> touchHandlers = new ArrayList<>();
     private final Deque<ConsoleLine> lines = new ArrayDeque<>();
     private final List<Timer> timers = new ArrayList<>();
@@ -295,7 +317,8 @@ public final class BrainRuntime {
     private void finishIfIdle() {
         if (running && timers.isEmpty() && touchHandlers.isEmpty()) {
             push(new ConsoleLine(BRAIN_TAG, "Script finished.", 0));
-            stop();
+            // A script that simply ends leaves its redstone signals as they are; only Stop or an error resets them.
+            halt(false);
         }
     }
 
@@ -331,6 +354,10 @@ public final class BrainRuntime {
 
     /** Stops the script. The console stays, so the player can still read it. */
     public void stop() {
+        halt(true);
+    }
+
+    private void halt(boolean releaseSignals) {
         boolean wasRunning = running;
         running = false;
         timers.clear();
@@ -346,11 +373,50 @@ public final class BrainRuntime {
             }
         }
         if (wasRunning) {
+            // Stop or an error: every Redstone Link on this network goes back to 0.
+            for (Map.Entry<String, String> entry : releaseSignals ? devices.entrySet() : Map.<String, String>of().entrySet()) {
+                GlobalPos pos = positions.get(entry.getKey());
+                if (pos != null) {
+                    try {
+                        switch (entry.getValue()) {
+                            case "speaker" -> SpeakerApi.releaseAll(pos);
+                            case "redstone" -> RedstoneApi.releaseAll(pos);
+                            case "screen" -> ScreenApi.releaseAll(pos);
+                            default -> {
+                            }
+                        }
+                    } catch (RuntimeException e) {
+                        LOGGER.warn("MineComputers: could not reset a redstone link", e);
+                    }
+                }
+            }
             bump();
         }
     }
 
     // ------------------------------------------------- used by ScriptHost
+
+    void setMedia(Map<String, String> mediaIds) {
+        this.mediaIds = Map.copyOf(mediaIds);
+    }
+
+    /**
+     * The media store id of a dragged-in file of this Brain. For sound (video = false) an audio file or a video
+     * (its sound track) is fine; for a picture (video = true) it must be a video file.
+     */
+    String mediaId(String path, boolean video) {
+        String id = mediaIds.get(path);
+        if (id == null) {
+            throw new IllegalArgumentException("No media file \"" + path + "\" in this Brain (drag it into the Explorer first)");
+        }
+        int kind = net.minecomputers.network.MediaRules.kindOf(path);
+        boolean fits = video ? kind == net.minecomputers.network.MediaRules.VIDEO
+                : kind == net.minecomputers.network.MediaRules.AUDIO || kind == net.minecomputers.network.MediaRules.VIDEO;
+        if (!fits) {
+            throw new IllegalArgumentException(video ? "This is not a video file: " + path : "This file has no sound: " + path);
+        }
+        return id;
+    }
 
     String deviceType(String id) {
         return devices.get(id);

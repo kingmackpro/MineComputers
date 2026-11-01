@@ -166,6 +166,31 @@ public class ScreenBlockEntity extends BlockEntity {
         }
     }
 
+    /** Server, origin only: the stored video (media id) this screen shows to the players, null = none. Not saved. */
+    private String videoId;
+    private long lastVideoTick = Long.MIN_VALUE / 2;
+
+    /** Shows a stored video on this screen (the sound comes from a Speaker). At most once per second. */
+    public void playVideo(String id, boolean loop) {
+        if (!(level instanceof net.minecraft.server.level.ServerLevel serverLevel) || !isOrigin()) {
+            return;
+        }
+        long now = level.getGameTime();
+        if (now - lastVideoTick < 20) {
+            return;
+        }
+        lastVideoTick = now;
+        videoId = id;
+        net.minecomputers.network.MediaTransfer.playVideo(serverLevel, worldPosition, id, loop);
+    }
+
+    public void stopVideo() {
+        if (videoId != null && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            net.minecomputers.network.MediaTransfer.stopVideo(serverLevel, worldPosition);
+        }
+        videoId = null;
+    }
+
     private void releaseRenderResource() {
         if (renderResource != null) {
             try {
@@ -179,6 +204,7 @@ public class ScreenBlockEntity extends BlockEntity {
 
     @Override
     public void setRemoved() {
+        stopVideo();
         super.setRemoved();
         releaseRenderResource();
     }

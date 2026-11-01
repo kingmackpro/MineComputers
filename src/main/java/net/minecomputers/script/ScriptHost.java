@@ -38,6 +38,9 @@ public final class ScriptHost {
         if (pos == null || !"screen".equals(runtime.deviceType(id))) {
             throw new IllegalArgumentException("No screen with ID \"" + id + "\" on this network");
         }
+        if ("video".equals(op)) {
+            a = runtime.mediaId(String.valueOf(a), true); // path to media id
+        }
         return ScreenApi.call(pos, op, a, b, c, d, e);
     }
 
@@ -49,6 +52,29 @@ public final class ScriptHost {
             throw new IllegalArgumentException("No servo with ID \"" + id + "\" on this network");
         }
         return ServoApi.call(pos, op, a, b);
+    }
+
+    /** One call on a Redstone Link: get("redstone:1").setSignal(0, 15) and the other methods end up here (see {@link RedstoneApi}). */
+    @HostAccess.Export
+    public Object redstone(String id, String op, Object a, Object b, Object c) {
+        GlobalPos pos = runtime.devicePos(id);
+        if (pos == null || !"redstone".equals(runtime.deviceType(id))) {
+            throw new IllegalArgumentException("No redstone link with ID \"" + id + "\" on this network");
+        }
+        return RedstoneApi.call(pos, op, a, b, c);
+    }
+
+    /** One call on a Speaker (see {@link SpeakerApi}). */
+    @HostAccess.Export
+    public Object speaker(String id, String op, Object a, Object b, Object c) {
+        GlobalPos pos = runtime.devicePos(id);
+        if (pos == null || !"speaker".equals(runtime.deviceType(id))) {
+            throw new IllegalArgumentException("No speaker with ID \"" + id + "\" on this network");
+        }
+        if ("file".equals(op)) {
+            a = runtime.mediaId(String.valueOf(a), false); // the script gives a path, the speaker gets the media id
+        }
+        return SpeakerApi.call(pos, op, a, b, c);
     }
 
     @HostAccess.Export

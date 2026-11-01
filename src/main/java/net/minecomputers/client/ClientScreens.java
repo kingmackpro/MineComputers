@@ -59,6 +59,26 @@ public final class ClientScreens {
         }
     }
 
+    public static void onMediaPlay(net.minecomputers.network.MediaPlay play) {
+        MediaClient.onPlay(play);
+    }
+
+    public static void onMediaStop(net.minecomputers.network.MediaStop stop) {
+        MediaClient.onStop(stop);
+    }
+
+    public static void onVideoPlay(net.minecomputers.network.VideoPlay play) {
+        MediaClient.onVideoPlay(play);
+    }
+
+    public static void onVideoStop(net.minecomputers.network.VideoStop stop) {
+        MediaClient.onVideoStop(stop);
+    }
+
+    public static void onMediaData(net.minecomputers.network.MediaData data) {
+        MediaClient.onData(data);
+    }
+
     private ClientScreens() {
     }
 }

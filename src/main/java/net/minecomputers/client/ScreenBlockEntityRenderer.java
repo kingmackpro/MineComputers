@@ -39,6 +39,7 @@ public class ScreenBlockEntityRenderer implements BlockEntityRenderer<ScreenBloc
     /** The layers stand this far apart (in blocks) so they don't flicker into each other at a distance. */
     private static final float Z_BASE = 0.002f;
     private static final float Z_CELLS = 0.004f;
+    private static final float Z_VIDEO = 0.005f;
     private static final float Z_PIXELS = 0.006f;
     private static final float Z_TEXT = 0.008f;
     private static final int FACE_COLOR = 0xFF050505;
@@ -136,16 +137,17 @@ public class ScreenBlockEntityRenderer implements BlockEntityRenderer<ScreenBloc
                        int packedLight, int packedOverlay) {
         ScreenTerminal terminal = screen.clientTerminal();
         BlockState state = screen.getBlockState();
-        if (!screen.isOrigin() || terminal == null || !(state.getBlock() instanceof ScreenBlock)) {
+        VideoPlayer video = screen.isOrigin() ? MediaClient.video(screen.getBlockPos()) : null;
+        if (!screen.isOrigin() || (terminal == null && video == null) || !(state.getBlock() instanceof ScreenBlock)) {
             return;
         }
         Direction facing = state.getValue(ScreenBlock.FACING);
-        float width = terminal.blocksW();
-        float height = terminal.blocksH();
+        float width = terminal != null ? terminal.blocksW() : screen.groupWidth();
+        float height = terminal != null ? terminal.blocksH() : screen.groupHeight();
         float areaW = width - 2 * MARGIN;
         float areaH = height - 2 * MARGIN;
-        int cols = terminal.cols();
-        int rows = terminal.rows();
+        int cols = terminal != null ? terminal.cols() : 1;
+        int rows = terminal != null ? terminal.rows() : 1;
         float cellW = areaW / cols;
         float cellH = areaH / rows;
         int light = LightTexture.FULL_BRIGHT; // a screen lights itself, whatever the light around it
@@ -161,8 +163,9 @@ public class ScreenBlockEntityRenderer implements BlockEntityRenderer<ScreenBloc
         VertexConsumer quads = buffer.getBuffer(RenderType.debugQuads());
         quad(quads, matrix, 0, 0, width, -height, Z_BASE, FACE_COLOR);
 
-        // 2. Cell backgrounds: runs of the same color along a row become one quad.
-        for (int r = 0; r < rows; r++) {
+        // 2. Cell backgrounds: runs of the same color along a row become one quad. (All colored quads are drawn
+        // before any textured layer: asking the buffer source for a second render type closes the first one.)
+        for (int r = 0; terminal != null && r < rows; r++) {
             int c = 0;
             while (c < cols) {
                 int color = terminal.bgAt(r * cols + c);
@@ -176,6 +179,29 @@ public class ScreenBlockEntityRenderer implements BlockEntityRenderer<ScreenBloc
                 }
                 c = end;
             }
+        }
+
+        // 2b. The video, fitted into the drawing area (the rest of the face stays black).
+        if (video != null && video.update()) {
+            float fitW = areaW;
+            float fitH = areaW / video.aspect();
+            if (fitH > areaH) {
+                fitH = areaH;
+                fitW = areaH * video.aspect();
+            }
+            float vx0 = (width - fitW) / 2f;
+            float vx1 = vx0 + fitW;
+            float vy0 = -(height - fitH) / 2f;
+            float vy1 = vy0 - fitH;
+            VertexConsumer vtex = buffer.getBuffer(RenderType.text(video.location()));
+            vtex.addVertex(matrix, vx0, vy1, Z_VIDEO).setColor(0xFFFFFFFF).setUv(0f, 1f).setLight(light);
+            vtex.addVertex(matrix, vx1, vy1, Z_VIDEO).setColor(0xFFFFFFFF).setUv(1f, 1f).setLight(light);
+            vtex.addVertex(matrix, vx1, vy0, Z_VIDEO).setColor(0xFFFFFFFF).setUv(1f, 0f).setLight(light);
+            vtex.addVertex(matrix, vx0, vy0, Z_VIDEO).setColor(0xFFFFFFFF).setUv(0f, 0f).setLight(light);
+        }
+        if (terminal == null) {
+            poseStack.popPose();
+            return;
         }
 
         // 3. The pixel layer.

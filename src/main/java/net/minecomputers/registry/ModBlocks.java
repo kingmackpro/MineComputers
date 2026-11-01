@@ -4,8 +4,10 @@ import net.minecomputers.MineComputers;
 import net.minecomputers.block.BrainBlock;
 import net.minecomputers.block.CableBlock;
 import net.minecomputers.block.LaptopBlock;
+import net.minecomputers.block.RedstoneLinkBlock;
 import net.minecomputers.block.ScreenBlock;
 import net.minecomputers.block.ServoBlock;
+import net.minecomputers.block.SpeakerBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -37,8 +39,8 @@ public final class ModBlocks {
     // Devices.
     public static final DeferredBlock<Block> SERVO = BLOCKS.<Block>registerBlock("servo", ServoBlock::new, machine());
     public static final DeferredBlock<Block> SCREEN = BLOCKS.<Block>registerBlock("screen", ScreenBlock::new, machine());
-    public static final DeferredBlock<Block> SPEAKER = BLOCKS.registerSimpleBlock("speaker", machine());
-    public static final DeferredBlock<Block> REDSTONE_LINK = BLOCKS.registerSimpleBlock("redstone_link", machine());
+    public static final DeferredBlock<Block> SPEAKER = BLOCKS.<Block>registerBlock("speaker", SpeakerBlock::new, machine());
+    public static final DeferredBlock<Block> REDSTONE_LINK = BLOCKS.<Block>registerBlock("redstone_link", RedstoneLinkBlock::new, machine());
     public static final DeferredBlock<Block> REMOTE_GATEWAY = BLOCKS.registerSimpleBlock("remote_gateway", machine());
 
     // A block that gives unlimited FE to everything it touches (and to cables it touches). For testing and creative use.

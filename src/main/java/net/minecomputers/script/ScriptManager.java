@@ -45,6 +45,12 @@ public final class ScriptManager {
      */
     public static BrainRuntime run(GlobalPos brain, Map<String, String> files, Map<String, String> devices,
                                    Map<String, GlobalPos> positions) {
+        return run(brain, files, devices, positions, Map.of());
+    }
+
+    /** Like the other run: mediaIds maps media paths ("media/song.mp3") to their ids in the media store. */
+    public static BrainRuntime run(GlobalPos brain, Map<String, String> files, Map<String, String> devices,
+                                   Map<String, GlobalPos> positions, Map<String, String> mediaIds) {
         BrainRuntime existing = RUNTIMES.get(brain);
         long now = System.nanoTime();
         Long last = LAST_START.get(brain);
@@ -57,6 +63,7 @@ public final class ScriptManager {
         }
         try {
             BrainRuntime runtime = new BrainRuntime(devices, positions);
+            runtime.setMedia(mediaIds);
             RUNTIMES.put(brain, runtime);
             runtime.start(engine(), files);
             return runtime;

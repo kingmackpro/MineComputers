@@ -96,7 +96,9 @@ public final class ServerHandlers {
                     devices.put(device.id(), device.type());
                     positions.put(device.id(), GlobalPos.of(level.dimension(), new BlockPos(device.x(), device.y(), device.z())));
                 }
-                BrainRuntime runtime = ScriptManager.run(key, new HashMap<>(brain.files()), devices, positions);
+                Map<String, String> mediaIds = new HashMap<>();
+                brain.media().forEach((mediaPath, info) -> mediaIds.put(mediaPath, info.id()));
+                BrainRuntime runtime = ScriptManager.run(key, new HashMap<>(brain.files()), devices, positions, mediaIds);
                 if (runtime == null) {
                     PacketDistributor.sendToPlayer(player, new ConsoleSync(pos, 0, false, List.of(new ConsoleLine(
                             BrainRuntime.BRAIN_TAG, "The JavaScript engine failed to load. See latest.log.", 2))));
@@ -160,6 +162,7 @@ public final class ServerHandlers {
     /** A player who leaves loses an upload in progress. */
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         UPLOADS.remove(event.getEntity().getUUID());
+        MediaTransfer.onLogout(event.getEntity().getUUID());
     }
 
     private static String startProblem(BrainBlockEntity brain, LaptopUpload upload) {
