@@ -1,0 +1,7 @@
+{
+  "parent": "minecomputers:block/pipe_data_conektion_2_d_w",
+  "textures": {
+    "0": "minecomputers:block/pipe_power_data",
+    "particle": "minecomputers:block/pipe_power_data"
+  }
+}
