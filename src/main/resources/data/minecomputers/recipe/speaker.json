@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": ["III", "INI", "IEI"],
+  "key": {
+    "I": {"item": "minecraft:iron_ingot"},
+    "N": {"item": "minecraft:note_block"},
+    "E": {"item": "create:electron_tube"}
+  },
+  "result": {"id": "minecomputers:speaker", "count": 1}
+}

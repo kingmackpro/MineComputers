@@ -136,6 +136,11 @@ public class RedstoneLinkBlockEntity extends BlockEntity {
         return item == Items.AIR ? "" : BuiltInRegistries.ITEM.getKey(item).toString();
     }
 
+    /** One of the two frequency items of a link (Items.AIR when empty). Used by the GUI menu. */
+    public Item frequencyItem(int index, boolean second) {
+        return second ? link(index).second : link(index).first;
+    }
+
     public boolean isPowered() {
         return powered;
     }

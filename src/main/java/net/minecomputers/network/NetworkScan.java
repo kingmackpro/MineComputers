@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Set;
 
 import net.minecomputers.block.entity.BrainBlockEntity;
+import net.minecomputers.block.entity.RedstoneLinkBlockEntity;
 import net.minecomputers.block.entity.ScreenBlockEntity;
 import net.minecomputers.registry.ModBlocks;
 import net.minecraft.core.BlockPos;
@@ -34,6 +35,10 @@ public final class NetworkScan {
         List<BlockPos> devicePositions = new ArrayList<>();
         BlockPos brainPos = null;
 
+        // Scanning from the Brain itself (autostart): the Brain is the start, so it is found too.
+        if (level.getBlockState(laptop).getBlock() == ModBlocks.BRAIN.get()) {
+            brainPos = laptop;
+        }
         visited.add(laptop);
         queue.add(laptop);
         while (!queue.isEmpty() && visited.size() < MAX_BLOCKS) {
@@ -94,6 +99,11 @@ public final class NetworkScan {
         devicePositions.sort(Comparator.comparingLong(BlockPos::asLong));
         List<LaptopSnapshot.DeviceEntry> devices = new ArrayList<>();
         devices.add(new LaptopSnapshot.DeviceEntry("brain", "brain:1", brainPos.getX(), brainPos.getY(), brainPos.getZ()));
+        // Remote use: the scan started at a Remote Gateway, which is the entry point and also a device of the network.
+        if (level.getBlockState(laptop).is(ModBlocks.REMOTE_GATEWAY.get())) {
+            devices.add(new LaptopSnapshot.DeviceEntry("gateway", brain.idFor("gateway", laptop),
+                    laptop.getX(), laptop.getY(), laptop.getZ()));
+        }
         for (BlockPos pos : devicePositions) {
             String type = deviceType(level.getBlockState(pos).getBlock());
             String id;
@@ -102,7 +112,15 @@ public final class NetworkScan {
             } else {
                 id = brain.idFor(type, pos);
             }
-            devices.add(new LaptopSnapshot.DeviceEntry(type, id, pos.getX(), pos.getY(), pos.getZ()));
+            List<String> links = List.of();
+            if ("redstone".equals(type) && level.getBlockEntity(pos) instanceof RedstoneLinkBlockEntity redstone) {
+                links = new ArrayList<>();
+                for (int i = 0; i < RedstoneLinkBlockEntity.LINKS; i++) {
+                    links.add(redstone.frequencyName(i, false));
+                    links.add(redstone.frequencyName(i, true));
+                }
+            }
+            devices.add(new LaptopSnapshot.DeviceEntry(type, id, pos.getX(), pos.getY(), pos.getZ(), links));
         }
         List<LaptopSnapshot.MediaEntry> media = new ArrayList<>();
         brain.media().forEach((path, info) -> media.add(new LaptopSnapshot.MediaEntry(path, info.size())));

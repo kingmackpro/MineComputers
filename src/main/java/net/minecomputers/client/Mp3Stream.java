@@ -30,7 +30,11 @@ final class Mp3Stream implements AudioStream {
     private boolean finished;
     private int framesThisPass;
 
-    Mp3Stream(byte[] data, boolean loop) throws IOException {
+    /**
+     * startMs = where the shared clock is: the stream starts that far into the file (modulo its length when looping;
+     * past the end of a non-looping file it is silent). Skipping works frame by frame without decoding.
+     */
+    Mp3Stream(byte[] data, boolean loop, long startMs) throws IOException {
         this.data = data;
         this.loop = loop;
         open();
@@ -38,6 +42,56 @@ final class Mp3Stream implements AudioStream {
             throw new IOException("This MP3 has no audio frames");
         }
         this.format = new AudioFormat(decoder.getOutputFrequency(), 16, 1, true, false);
+        if (startMs > 0) {
+            double total = lengthMs();
+            long seek = startMs;
+            boolean past = false;
+            if (total > 0) {
+                if (loop) {
+                    seek = startMs % (long) Math.max(1, Math.floor(total));
+                } else if (startMs >= total) {
+                    past = true;
+                }
+            }
+            pending = new byte[0];
+            pendingPos = 0;
+            if (past) {
+                finished = true;
+            } else {
+                open();
+                framesThisPass = 1; // the file has frames (checked above), so a loop may start over
+                try {
+                    double skipped = 0;
+                    while (skipped < seek) {
+                        Header header = bitstream.readFrame();
+                        if (header == null) {
+                            break;
+                        }
+                        skipped += header.ms_per_frame();
+                        bitstream.closeFrame();
+                    }
+                } catch (JavaLayerException e) {
+                    throw new IOException("MP3 seek failed: " + e.getMessage(), e);
+                }
+            }
+        }
+    }
+
+    /** Length of the file in milliseconds, from the frame headers (fast, nothing is decoded). 0 if unknown. */
+    private double lengthMs() {
+        double total = 0;
+        try {
+            Bitstream counter = new Bitstream(new ByteArrayInputStream(data));
+            Header header;
+            while ((header = counter.readFrame()) != null) {
+                total += header.ms_per_frame();
+                counter.closeFrame();
+            }
+            counter.close();
+        } catch (JavaLayerException e) {
+            return 0;
+        }
+        return total;
     }
 
     private void open() {

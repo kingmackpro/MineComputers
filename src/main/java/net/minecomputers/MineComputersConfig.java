@@ -16,6 +16,7 @@ public final class MineComputersConfig {
     private static final ModConfigSpec.IntValue TOUCH_CAP_MS;
     private static final ModConfigSpec.IntValue GLOBAL_BUDGET_MS;
     private static final ModConfigSpec.BooleanValue FREE_POWER;
+    private static final ModConfigSpec.BooleanValue HACK_OWN_SYSTEMS;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -40,6 +41,9 @@ public final class MineComputersConfig {
         FREE_POWER = builder
                 .comment("If true, Servos and other FE devices work without any FE source (for testing only)")
                 .define("freePower", false);
+        HACK_OWN_SYSTEMS = builder
+                .comment("If true, the owner and ops of a Cipher-locked system must hack it too, so one player can test the hacking mini game (for testing only)")
+                .define("hackOwnSystems", false);
         builder.pop();
         SPEC = builder.build();
     }
@@ -71,6 +75,14 @@ public final class MineComputersConfig {
     public static boolean freePower() {
         try {
             return FREE_POWER.get();
+        } catch (Throwable t) {
+            return false; // config not loaded yet
+        }
+    }
+
+    public static boolean hackOwnSystems() {
+        try {
+            return HACK_OWN_SYSTEMS.get();
         } catch (Throwable t) {
             return false; // config not loaded yet
         }

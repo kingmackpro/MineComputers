@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": ["EPE", "EBE", "EEE"],
+  "key": {
+    "E": {"item": "create:electron_tube"},
+    "P": {"item": "create:precision_mechanism"},
+    "B": {"item": "create:brass_casing"}
+  },
+  "result": {"id": "minecomputers:brain", "count": 1}
+}

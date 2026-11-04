@@ -36,8 +36,13 @@ final class MediaClient {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Pattern ID = Pattern.compile("[0-9a-f]{64}");
 
-    /** What to start once the file is here: sound at a Speaker, or video at a Screen. */
-    private record Request(boolean video, BlockPos pos, float volume, boolean loop) {
+    /**
+     * What to start once the file is here: sound at a Speaker, or video at a Screen. originNanos is the moment (on this
+     * client's System.nanoTime clock) at which the playback was at position 0: the server said it was at positionMs when
+     * the packet arrived. Position now = (nanoTime - originNanos). A download that takes a while does not delay the
+     * playback, the player just joins in further along. Screen and Speaker work this out the same way, so they match.
+     */
+    private record Request(boolean video, BlockPos pos, float volume, boolean loop, long originNanos) {
     }
 
     private static final class Download {
@@ -65,8 +70,9 @@ final class MediaClient {
             return;
         }
         stopSound(play.pos());
+        forget(play.pos(), false);
         float volume = Math.max(0f, Math.min(2f, play.volume()));
-        want(play.id(), new Request(false, play.pos().immutable(), volume, play.loop()));
+        want(play.id(), new Request(false, play.pos().immutable(), volume, play.loop(), originOf(play.positionMs())));
     }
 
     static void onVideoPlay(VideoPlay play) {
@@ -74,7 +80,13 @@ final class MediaClient {
             return;
         }
         stopVideo(play.pos());
-        want(play.id(), new Request(true, play.pos().immutable(), 0f, play.loop()));
+        forget(play.pos(), true);
+        want(play.id(), new Request(true, play.pos().immutable(), 0f, play.loop(), originOf(play.positionMs())));
+    }
+
+    private static long originOf(long positionMs) {
+        long position = Math.max(0L, Math.min(positionMs, 1_000_000_000L));
+        return System.nanoTime() - position * 1_000_000L;
     }
 
     private static void want(String id, Request request) {
@@ -168,10 +180,11 @@ final class MediaClient {
     private static void start(Request request, Path file) {
         if (request.video()) {
             stopVideo(request.pos());
-            VIDEOS.put(request.pos(), new VideoPlayer(file, request.loop()));
+            VIDEOS.put(request.pos(), new VideoPlayer(file, request.loop(), request.originNanos()));
         } else {
             stopSound(request.pos());
-            MediaSoundInstance instance = new MediaSoundInstance(request.pos(), file, request.volume(), request.loop());
+            MediaSoundInstance instance = new MediaSoundInstance(request.pos(), file, request.volume(), request.loop(),
+                    request.originNanos());
             PLAYING.put(request.pos(), instance);
             Minecraft.getInstance().getSoundManager().play(instance);
         }

@@ -1,6 +1,7 @@
 package net.minecomputers.block;
 
-import net.minecomputers.network.NetworkScan;
+import net.minecomputers.network.CipherLock;
+import net.minecomputers.network.LaptopSnapshot;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -23,7 +24,10 @@ public class LaptopBlock extends Block {
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
         if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
-            PacketDistributor.sendToPlayer(serverPlayer, NetworkScan.snapshot(level, pos, true));
+            LaptopSnapshot snapshot = CipherLock.snapshotFor(serverPlayer, level, pos, true);
+            if (snapshot != null) {
+                PacketDistributor.sendToPlayer(serverPlayer, snapshot);
+            }
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }

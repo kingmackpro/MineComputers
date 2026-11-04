@@ -28,13 +28,31 @@ final class FfmpegAudioStream implements AudioStream {
     private boolean finished;
     private boolean gotSamplesThisPass;
 
-    FfmpegAudioStream(Path file, boolean loop) throws IOException {
+    /**
+     * startMs = where the shared clock is: the stream starts that far into the file (modulo its length when looping;
+     * past the end of a non-looping file it is silent).
+     */
+    FfmpegAudioStream(Path file, boolean loop, long startMs) throws IOException {
         this.loop = loop;
         this.grabber = new FFmpegFrameGrabber(file.toFile());
         grabber.setAudioChannels(1);
         grabber.setSampleRate(SAMPLE_RATE);
         grabber.setSampleFormat(avutil.AV_SAMPLE_FMT_S16);
         grabber.start();
+        long lengthMs = grabber.getLengthInTime() / 1000L;
+        long seekMs = 0;
+        if (lengthMs > 0 && startMs > 0) {
+            if (loop) {
+                seekMs = startMs % lengthMs;
+            } else if (startMs >= lengthMs) {
+                finished = true;
+            } else {
+                seekMs = startMs;
+            }
+        }
+        if (seekMs > 0) {
+            grabber.setTimestamp(seekMs * 1000L);
+        }
     }
 
     /** Decodes the next block of samples into `pending`. Returns false when the audio has ended. */

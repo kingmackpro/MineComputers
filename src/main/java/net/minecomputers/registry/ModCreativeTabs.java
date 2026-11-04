@@ -21,6 +21,7 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.LAPTOP.get());
                         output.accept(ModItems.REMOTE_ACCESS.get());
                         output.accept(ModItems.LINK_TRANSMITTER.get());
+                        output.accept(ModItems.RANGE_BOOSTER.get());
                         output.accept(ModItems.CIPHER.get());
                         output.accept(ModItems.BRAIN.get());
                         output.accept(ModItems.DATA_CABLE.get());

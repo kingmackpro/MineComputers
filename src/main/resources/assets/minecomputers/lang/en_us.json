@@ -15,5 +15,6 @@
 
   "item.minecomputers.remote_access": "Remote Access Upgrade",
   "item.minecomputers.link_transmitter": "Link Transmitter",
+  "item.minecomputers.range_booster": "Range Booster",
   "item.minecomputers.cipher": "Cipher"
 }

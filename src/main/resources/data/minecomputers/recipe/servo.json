@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": ["EPE", "ASA", "III"],
+  "key": {
+    "E": {"item": "create:electron_tube"},
+    "P": {"item": "create:precision_mechanism"},
+    "A": {"item": "create:andesite_alloy"},
+    "S": {"item": "create:shaft"},
+    "I": {"item": "minecraft:iron_ingot"}
+  },
+  "result": {"id": "minecomputers:servo", "count": 1}
+}

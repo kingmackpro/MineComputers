@@ -8,7 +8,10 @@ import java.util.List;
 import java.util.Map;
 
 import com.mojang.logging.LogUtils;
+import net.minecomputers.block.entity.BrainBlockEntity;
+import net.minecomputers.network.ServerHandlers;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -30,8 +33,43 @@ public final class ScriptManager {
 
     private static final Map<GlobalPos, BrainRuntime> RUNTIMES = new LinkedHashMap<>();
     private static final Map<GlobalPos, Long> LAST_START = new HashMap<>();
+    /** Brains whose chunk just loaded and whose script was running: ticks left until it starts again. */
+    private static final Map<GlobalPos, Integer> PENDING = new LinkedHashMap<>();
+    /** Wait after the chunk loads, so the cables and devices around the Brain are loaded too. */
+    private static final int AUTOSTART_DELAY_TICKS = 40;
     private static Engine engine;
     private static int rotation;
+
+    /** Called when a Brain that was running when it was saved (or unloaded) loads again. */
+    public static void scheduleAutostart(GlobalPos brain) {
+        PENDING.put(brain, AUTOSTART_DELAY_TICKS);
+    }
+
+    private static void runPending(MinecraftServer server) {
+        var iterator = PENDING.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<GlobalPos, Integer> entry = iterator.next();
+            int left = entry.getValue() - 1;
+            if (left > 0) {
+                entry.setValue(left);
+                continue;
+            }
+            iterator.remove();
+            GlobalPos key = entry.getKey();
+            ServerLevel level = server.getLevel(key.dimension());
+            if (level == null || !level.isLoaded(key.pos())) {
+                continue; // unloaded again: it is scheduled again when it loads
+            }
+            BrainRuntime existing = RUNTIMES.get(key);
+            if (existing != null && existing.isRunning()) {
+                continue;
+            }
+            if (level.getBlockEntity(key.pos()) instanceof BrainBlockEntity brain && brain.autoRun()) {
+                LOGGER.info("MineComputers: starting the script of the Brain at {} again", key.pos());
+                ServerHandlers.startScript(level, key.pos(), brain);
+            }
+        }
+    }
 
     /** The runtime of this Brain (running, or stopped with its console kept), or null. */
     public static BrainRuntime get(GlobalPos brain) {
@@ -99,6 +137,7 @@ public final class ScriptManager {
     public static void discard(GlobalPos brain) {
         BrainRuntime runtime = RUNTIMES.remove(brain);
         LAST_START.remove(brain);
+        PENDING.remove(brain);
         if (runtime != null) {
             runtime.stop();
         }
@@ -124,6 +163,9 @@ public final class ScriptManager {
     }
 
     public static void onTick(ServerTickEvent.Post event) {
+        if (!PENDING.isEmpty()) {
+            runPending(event.getServer());
+        }
         if (RUNTIMES.isEmpty()) {
             return;
         }
@@ -140,6 +182,9 @@ public final class ScriptManager {
             if (level == null || !level.isLoaded(entry.getKey().pos())) {
                 continue;
             }
+            if (net.minecomputers.network.HackManager.isHacked(entry.getKey())) {
+                continue; // the system is being hacked: it does not work (SPEC section 8)
+            }
             runtime.tick();
             if (System.nanoTime() - start > net.minecomputers.MineComputersConfig.globalBudgetMs() * 1_000_000L) {
                 break;
@@ -154,6 +199,7 @@ public final class ScriptManager {
         }
         RUNTIMES.clear();
         LAST_START.clear();
+        PENDING.clear();
         if (engine != null) {
             try {
                 engine.close(true);

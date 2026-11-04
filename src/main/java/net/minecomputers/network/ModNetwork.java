@@ -26,6 +26,9 @@ public final class ModNetwork {
                 (payload, context) -> ClientScreens.onVideoPlay(payload));
         registrar.playToClient(VideoStop.TYPE, VideoStop.STREAM_CODEC,
                 (payload, context) -> ClientScreens.onVideoStop(payload));
+        registrar.playToClient(HackState.TYPE, HackState.STREAM_CODEC,
+                (payload, context) -> ClientScreens.onHackState(payload));
+        registrar.playToServer(HackAction.TYPE, HackAction.STREAM_CODEC, HackManager::handle);
         registrar.playToServer(MediaRequest.TYPE, MediaRequest.STREAM_CODEC, MediaTransfer::handleRequest);
         registrar.playToServer(LaptopAction.TYPE, LaptopAction.STREAM_CODEC, ServerHandlers::handleAction);
         registrar.playToServer(LaptopUpload.TYPE, LaptopUpload.STREAM_CODEC, ServerHandlers::handleUpload);

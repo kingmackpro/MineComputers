@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": ["EPE", "BMB", "III"],
+  "key": {
+    "E": {"item": "create:electron_tube"},
+    "P": {"item": "minecraft:ender_pearl"},
+    "B": {"item": "create:brass_casing"},
+    "M": {"item": "create:precision_mechanism"},
+    "I": {"item": "minecraft:iron_ingot"}
+  },
+  "result": {"id": "minecomputers:remote_gateway", "count": 1}
+}

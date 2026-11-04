@@ -26,11 +26,14 @@ final class MediaSoundInstance extends AbstractSoundInstance {
 
     private final Path file;
     private final boolean loopAudio;
+    /** The moment (System.nanoTime) at which the playback was at position 0: the shared clock, see MediaClient. */
+    private final long originNanos;
 
-    MediaSoundInstance(BlockPos pos, Path file, float volume, boolean loopAudio) {
+    MediaSoundInstance(BlockPos pos, Path file, float volume, boolean loopAudio, long originNanos) {
         super(EVENT, SoundSource.RECORDS, RandomSource.create());
         this.file = file;
         this.loopAudio = loopAudio;
+        this.originNanos = originNanos;
         this.x = pos.getX() + 0.5;
         this.y = pos.getY() + 0.5;
         this.z = pos.getZ() + 0.5;
@@ -41,10 +44,13 @@ final class MediaSoundInstance extends AbstractSoundInstance {
     @Override
     public CompletableFuture<AudioStream> getStream(SoundBufferLibrary buffers, Sound sound, boolean looping) {
         try {
+            // The sound engine asks for the stream a moment after the sound was queued: start where the shared
+            // clock is NOW, not where it was when we queued.
+            long startMs = Math.max(0L, (System.nanoTime() - originNanos) / 1_000_000L);
             if (looksLikeMp3(file)) {
-                return CompletableFuture.completedFuture(new Mp3Stream(Files.readAllBytes(file), loopAudio));
+                return CompletableFuture.completedFuture(new Mp3Stream(Files.readAllBytes(file), loopAudio, startMs));
             }
-            return CompletableFuture.completedFuture(new FfmpegAudioStream(file, loopAudio));
+            return CompletableFuture.completedFuture(new FfmpegAudioStream(file, loopAudio, startMs));
         } catch (IOException | RuntimeException | LinkageError e) {
             return CompletableFuture.failedFuture(e);
         }

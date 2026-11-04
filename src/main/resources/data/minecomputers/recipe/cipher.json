@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": ["TMT", "IGI"],
+  "key": {
+    "T": {"item": "create:electron_tube"},
+    "M": {"item": "create:precision_mechanism"},
+    "I": {"item": "minecraft:iron_ingot"},
+    "G": {"item": "minecraft:gold_ingot"}
+  },
+  "result": {"id": "minecomputers:cipher", "count": 1}
+}

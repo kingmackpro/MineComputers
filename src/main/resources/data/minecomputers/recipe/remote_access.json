@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": ["TET", "MBM"],
+  "key": {
+    "T": {"item": "create:electron_tube"},
+    "E": {"item": "minecraft:ender_pearl"},
+    "M": {"item": "create:precision_mechanism"},
+    "B": {"item": "create:brass_casing"}
+  },
+  "result": {"id": "minecomputers:remote_access", "count": 1}
+}

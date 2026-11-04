@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    {"item": "minecomputers:data_cable"},
+    {"item": "minecomputers:power_cable"}
+  ],
+  "result": {"id": "minecomputers:power_data_cable", "count": 1}
+}

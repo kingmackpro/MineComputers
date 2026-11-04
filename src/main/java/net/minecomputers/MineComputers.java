@@ -1,12 +1,16 @@
 package net.minecomputers;
 
+import net.minecomputers.network.HackManager;
+import net.minecomputers.network.MediaTransfer;
 import net.minecomputers.network.ModNetwork;
 import net.minecomputers.network.ServerHandlers;
 import net.minecomputers.power.InfiniteEnergy;
 import net.minecomputers.registry.ModBlockEntities;
 import net.minecomputers.registry.ModBlocks;
 import net.minecomputers.registry.ModCreativeTabs;
+import net.minecomputers.registry.ModDataComponents;
 import net.minecomputers.registry.ModItems;
+import net.minecomputers.registry.ModMenus;
 import net.minecomputers.screen.ScreenSync;
 import net.minecomputers.script.ScriptManager;
 import net.neoforged.bus.api.IEventBus;
@@ -35,7 +39,9 @@ public class MineComputers {
     public MineComputers(IEventBus modEventBus, ModContainer modContainer) {
         ModBlocks.BLOCKS.register(modEventBus);
         ModBlockEntities.BLOCK_ENTITIES.register(modEventBus);
+        ModDataComponents.COMPONENTS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
+        ModMenus.MENUS.register(modEventBus);
         ModCreativeTabs.TABS.register(modEventBus);
         modContainer.registerConfig(ModConfig.Type.COMMON, MineComputersConfig.SPEC);
         modEventBus.addListener(ModNetwork::register);
@@ -44,5 +50,9 @@ public class MineComputers {
         NeoForge.EVENT_BUS.addListener(ServerHandlers::onLogout);
         NeoForge.EVENT_BUS.addListener(ScriptManager::onStopping);
         NeoForge.EVENT_BUS.addListener(ScreenSync::onChunkSent);
+        NeoForge.EVENT_BUS.addListener(HackManager::onTick);
+        NeoForge.EVENT_BUS.addListener(HackManager::onServerStopping);
+        NeoForge.EVENT_BUS.addListener(MediaTransfer::onLevelTick);
+        NeoForge.EVENT_BUS.addListener(MediaTransfer::onServerStopping);
     }
 }

@@ -1,6 +1,10 @@
 package net.minecomputers.registry;
 
 import net.minecomputers.MineComputers;
+import net.minecomputers.item.CipherItem;
+import net.minecomputers.item.LaptopItem;
+import net.minecomputers.item.LinkTransmitterItem;
+import net.minecomputers.item.RemoteAccessItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -14,7 +18,9 @@ public final class ModItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MineComputers.MOD_ID);
 
     // Block items.
-    public static final DeferredItem<BlockItem> LAPTOP = ITEMS.registerSimpleBlockItem("laptop", ModBlocks.LAPTOP, new Item.Properties().stacksTo(1));
+    // The laptop is a custom item: it can get the Remote Access upgrade and be linked to a Remote Gateway.
+    public static final DeferredItem<LaptopItem> LAPTOP = ITEMS.registerItem("laptop",
+            props -> new LaptopItem(ModBlocks.LAPTOP.get(), props), new Item.Properties().stacksTo(1));
     public static final DeferredItem<BlockItem> BRAIN = ITEMS.registerSimpleBlockItem(ModBlocks.BRAIN);
     public static final DeferredItem<BlockItem> DATA_CABLE = ITEMS.registerSimpleBlockItem(ModBlocks.DATA_CABLE);
     public static final DeferredItem<BlockItem> POWER_CABLE = ITEMS.registerSimpleBlockItem(ModBlocks.POWER_CABLE);
@@ -28,9 +34,14 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> POWER_SOURCE = ITEMS.registerSimpleBlockItem(ModBlocks.POWER_SOURCE);
 
     // Standalone items.
-    public static final DeferredItem<Item> REMOTE_ACCESS = ITEMS.registerSimpleItem("remote_access", new Item.Properties().stacksTo(1));
-    public static final DeferredItem<Item> LINK_TRANSMITTER = ITEMS.registerSimpleItem("link_transmitter", new Item.Properties().stacksTo(1));
-    public static final DeferredItem<Item> CIPHER = ITEMS.registerSimpleItem("cipher", new Item.Properties().stacksTo(16));
+    public static final DeferredItem<RemoteAccessItem> REMOTE_ACCESS = ITEMS.registerItem("remote_access",
+            RemoteAccessItem::new, new Item.Properties().stacksTo(1));
+    public static final DeferredItem<LinkTransmitterItem> LINK_TRANSMITTER = ITEMS.registerItem("link_transmitter",
+            LinkTransmitterItem::new, new Item.Properties().stacksTo(1));
+    /** Laptop upgrade: +50 blocks of remote range per booster (two slots in the laptop menu). */
+    public static final DeferredItem<Item> RANGE_BOOSTER = ITEMS.registerSimpleItem("range_booster", new Item.Properties().stacksTo(1));
+    public static final DeferredItem<CipherItem> CIPHER = ITEMS.registerItem("cipher",
+            CipherItem::new, new Item.Properties().stacksTo(16));
 
     private ModItems() {
     }

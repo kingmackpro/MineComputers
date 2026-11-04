@@ -29,6 +29,20 @@ public final class ClientScreens {
         }
     }
 
+    /** The hacking mini game: open the hack screen for a locked system, or update / finish the open one. */
+    public static void onHackState(net.minecomputers.network.HackState state) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof HackScreen screen && screen.isFor(state.laptop())) {
+            if (state.phase() == net.minecomputers.network.HackState.DONE) {
+                minecraft.setScreen(null); // the editor opens next (the server sends the snapshot)
+            } else {
+                screen.apply(state);
+            }
+        } else if (state.phase() == net.minecomputers.network.HackState.OFFER) {
+            minecraft.setScreen(new HackScreen(state));
+        }
+    }
+
     /** The script console of the Brain changed. Only matters if the laptop GUI for that laptop is open. */
     public static void onConsole(ConsoleSync sync) {
         if (Minecraft.getInstance().screen instanceof LaptopScreen screen && screen.isFor(sync.laptop())) {

@@ -30,7 +30,9 @@ import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -101,7 +103,8 @@ public class LaptopScreen extends Screen {
     private record TreeRow(int indent, String name, String path, boolean folder, int media) {
     }
 
-    private record Card(ItemStack icon, String name, String pos, String id) {
+    /** links: for a Redstone Link the 16 frequency items (2 per link), shown when the mouse is over the card; else empty. */
+    private record Card(ItemStack icon, String name, String pos, String id, List<ItemStack> links) {
     }
 
     /** One screen row of the Console: a line (or one wrapped piece of it). */
@@ -375,8 +378,12 @@ public class LaptopScreen extends Screen {
             if (d.type().equals("gateway")) {
                 hasGateway = true;
             }
+            List<ItemStack> links = new ArrayList<>();
+            for (String name : d.links()) {
+                links.add(stackOf(name));
+            }
             cards.add(new Card(new ItemStack(iconFor(d.type())), nameFor(d.type()),
-                    "x " + d.x() + " y " + d.y() + " z " + d.z(), d.id()));
+                    "x " + d.x() + " y " + d.y() + " z " + d.z(), d.id(), links));
         }
     }
 
@@ -495,6 +502,17 @@ public class LaptopScreen extends Screen {
                 }
             }
         }
+    }
+
+    private static ItemStack stackOf(String name) {
+        if (name.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+        ResourceLocation id = ResourceLocation.tryParse(name);
+        if (id == null) {
+            return ItemStack.EMPTY;
+        }
+        return BuiltInRegistries.ITEM.getOptional(id).map(item -> new ItemStack(item)).orElse(ItemStack.EMPTY);
     }
 
     private static Item iconFor(String type) {
@@ -2552,7 +2570,10 @@ public class LaptopScreen extends Screen {
         } else if (editing()) {
             for (int[] hit : cardHit) {
                 if (inside(hit, mx, my)) {
-                    g.renderTooltip(this.font, Component.literal("Insert " + cards.get(hit[4]).id()), mx, my);
+                    // No tooltip on a card that shows a preview: it would cover it.
+                    if (cards.get(hit[4]).links().isEmpty()) {
+                        g.renderTooltip(this.font, Component.literal("Insert " + cards.get(hit[4]).id()), mx, my);
+                    }
                     break;
                 }
             }
@@ -3233,6 +3254,14 @@ public class LaptopScreen extends Screen {
         int idTop = idBottom - idH;
         g.fill(x + 3, idTop, x + w - 3, idBottom, 0xFF1B2A30);
         smallCentered(g, d.id(), x + w / 2, idTop + 2, 0.8f, 0xFF7FD6E0, w - 8);
+
+        // Mouse over a Redstone Link card: the whole card above the ID turns into a small version of its GUI
+        // (which link has what).
+        boolean over = hoverX >= x && hoverX < x + w && hoverY >= y && hoverY < y + h;
+        if (over && !d.links().isEmpty()) {
+            drawLinkPreview(g, d, x, y + 3, w, idTop - 2 - (y + 3));
+            return;
+        }
         smallCentered(g, d.pos(), x + w / 2, idTop - 6, 0.55f, MUTED, w - 6);
         smallCentered(g, d.name(), x + w / 2, idTop - 14, 0.8f, TEXT, w - 6);
 
@@ -3244,6 +3273,34 @@ public class LaptopScreen extends Screen {
         g.pose().scale(iconScale, iconScale, 1f);
         g.renderItem(d.icon(), 0, 0);
         g.pose().popPose();
+    }
+
+    /** The Redstone Link in miniature: links 1 to 8 in two columns, each with its two frequency items. */
+    private void drawLinkPreview(GuiGraphics g, Card d, int x, int top, int w, int h) {
+        int px1 = x + 3;
+        int px2 = x + w - 3;
+        g.fill(px1, top, px2, top + h, 0xFF1B2A30);
+        int cellW = (px2 - px1) / 2;
+        int rowH = Math.max(8, h / 4);
+        float scale = Math.min(0.75f, (rowH - 2) / 16f);
+        int iconPx = Math.round(16 * scale);
+        for (int i = 0; i < 8 && i * 2 + 1 < d.links().size(); i++) {
+            int cx = px1 + (i / 4) * cellW + 2;
+            int cy = top + (i % 4) * rowH + (rowH - iconPx) / 2;
+            smallLeft(g, Integer.toString(i + 1), cx, cy + Math.max(0, (iconPx - 5) / 2), 0.6f, 0xFF7FD6E0, 6);
+            for (int s = 0; s < 2; s++) {
+                int ix = cx + 7 + s * (iconPx + 2);
+                g.fill(ix - 1, cy - 1, ix + iconPx + 1, cy + iconPx + 1, 0xFF2A353B);
+                ItemStack stack = d.links().get(i * 2 + s);
+                if (!stack.isEmpty()) {
+                    g.pose().pushPose();
+                    g.pose().translate(ix, cy, 0);
+                    g.pose().scale(scale, scale, 1f);
+                    g.renderItem(stack, 0, 0);
+                    g.pose().popPose();
+                }
+            }
+        }
     }
 
     /** Centered text at a smaller scale; shrinks further if it would be wider than maxWidth. */

@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    {"item": "create:redstone_link"},
+    {"item": "create:redstone_link"},
+    {"item": "create:electron_tube"},
+    {"item": "create:brass_casing"}
+  ],
+  "result": {"id": "minecomputers:redstone_link", "count": 1}
+}

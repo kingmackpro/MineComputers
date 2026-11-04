@@ -28,8 +28,15 @@ public record LaptopSnapshot(BlockPos laptop, boolean open, boolean connected, L
     public record MediaEntry(String path, int size) {
     }
 
-    /** One connected device. The type is "brain", "screen", "servo", "speaker", "redstone" or "gateway". */
-    public record DeviceEntry(String type, String id, int x, int y, int z) {
+    /**
+     * One connected device. The type is "brain", "screen", "servo", "speaker", "redstone" or "gateway".
+     * links: only for a Redstone Link, 16 item names (first and second frequency item of links 1 to 8, "" = empty);
+     * empty list for every other device. It is the state when the snapshot was made.
+     */
+    public record DeviceEntry(String type, String id, int x, int y, int z, List<String> links) {
+        public DeviceEntry(String type, String id, int x, int y, int z) {
+            this(type, id, x, y, z, List.of());
+        }
     }
 
     private static final int MAX_TEXT = 262144;
@@ -69,6 +76,10 @@ public record LaptopSnapshot(BlockPos laptop, boolean open, boolean connected, L
             buf.writeInt(d.x());
             buf.writeInt(d.y());
             buf.writeInt(d.z());
+            buf.writeVarInt(d.links().size());
+            for (String name : d.links()) {
+                buf.writeUtf(name, 128);
+            }
         }
     }
 
@@ -94,7 +105,17 @@ public record LaptopSnapshot(BlockPos laptop, boolean open, boolean connected, L
         int deviceCount = buf.readVarInt();
         List<DeviceEntry> devices = new ArrayList<>();
         for (int i = 0; i < deviceCount; i++) {
-            devices.add(new DeviceEntry(buf.readUtf(64), buf.readUtf(64), buf.readInt(), buf.readInt(), buf.readInt()));
+            String type = buf.readUtf(64);
+            String id = buf.readUtf(64);
+            int x = buf.readInt();
+            int y = buf.readInt();
+            int z = buf.readInt();
+            int linkCount = Math.min(buf.readVarInt(), 16);
+            List<String> links = new ArrayList<>();
+            for (int k = 0; k < linkCount; k++) {
+                links.add(buf.readUtf(128));
+            }
+            devices.add(new DeviceEntry(type, id, x, y, z, links));
         }
         return new LaptopSnapshot(laptop, open, connected, folders, files, media, devices);
     }

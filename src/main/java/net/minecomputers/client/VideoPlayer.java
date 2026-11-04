@@ -28,6 +28,8 @@ final class VideoPlayer implements AutoCloseable {
 
     private final Path file;
     private final boolean loop;
+    /** The moment (System.nanoTime) at which the playback was at position 0: the shared clock, see MediaClient. */
+    private final long originNanos;
     private final Thread thread;
     private volatile boolean closed;
 
@@ -43,9 +45,10 @@ final class VideoPlayer implements AutoCloseable {
     private NativeImage image;
     private DynamicTexture texture;
 
-    VideoPlayer(Path file, boolean loop) {
+    VideoPlayer(Path file, boolean loop, long originNanos) {
         this.file = file;
         this.loop = loop;
+        this.originNanos = originNanos;
         this.thread = new Thread(this::run, "MineComputers-video");
         this.thread.setDaemon(true);
         this.thread.start();
@@ -78,26 +81,50 @@ final class VideoPlayer implements AutoCloseable {
                 grabber.setImageHeight(targetH);
                 grabber.setPixelFormat(avutil.AV_PIX_FMT_BGRA);
                 grabber.start();
-                long startNanos = System.nanoTime();
+                // The picture at time t of the file is shown when the shared clock says t. origin = the moment the
+                // current pass of the file was at 0. Joining late (or after a long download) seeks into the file.
+                long lengthMicros = grabber.getLengthInTime();
+                long origin = originNanos;
+                long elapsedMicros = Math.max(0L, (System.nanoTime() - origin) / 1000L);
+                if (lengthMicros > 0) {
+                    if (loop) {
+                        long cycles = elapsedMicros / lengthMicros;
+                        origin += cycles * lengthMicros * 1000L;
+                        elapsedMicros -= cycles * lengthMicros;
+                    } else if (elapsedMicros >= lengthMicros) {
+                        // Already over: show the last picture.
+                        elapsedMicros = Math.max(0L, lengthMicros - 200_000L);
+                        origin = System.nanoTime() - elapsedMicros * 1000L;
+                    }
+                }
+                if (elapsedMicros > 100_000L) {
+                    grabber.setTimestamp(elapsedMicros);
+                }
                 boolean gotFrame = false;
+                long lastStamp = 0;
+                long lastPublish = 0;
                 while (!closed) {
                     Frame next = grabber.grabImage();
                     if (next == null || next.image == null) {
                         if (loop && gotFrame) {
+                            origin += Math.max(lengthMicros, lastStamp + 40_000L) * 1000L;
                             grabber.setTimestamp(0);
-                            startNanos = System.nanoTime();
                             gotFrame = false;
                             continue;
                         }
                         break; // the last frame stays on the screen
                     }
                     gotFrame = true;
-                    long dueNanos = startNanos + next.timestamp * 1000L;
+                    lastStamp = next.timestamp;
+                    long dueNanos = origin + next.timestamp * 1000L;
                     long wait = dueNanos - System.nanoTime();
                     if (wait > 0) {
                         Thread.sleep(wait / 1_000_000L, (int) (wait % 1_000_000L));
+                    } else if (wait < -100_000_000L && System.nanoTime() - lastPublish < 250_000_000L) {
+                        continue; // more than 100 ms late: skip this picture to catch up (one is still shown every 250 ms)
                     }
                     publish(next);
+                    lastPublish = System.nanoTime();
                 }
             }
         } catch (InterruptedException e) {

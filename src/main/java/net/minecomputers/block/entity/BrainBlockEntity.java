@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
 
 import net.minecomputers.network.MediaRules;
 import net.minecomputers.network.PathRules;
@@ -43,8 +44,76 @@ public class BrainBlockEntity extends BlockEntity {
     /** Per device type, the last number handed out. */
     private final Map<String, Integer> counters = new HashMap<>();
 
+    /** True while the player wants the script running: set by Run, cleared by Stop. Saved, so it restarts after a restart. */
+    private boolean autoRun;
+
     public BrainBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.BRAIN.get(), pos, state);
+    }
+
+    /** The player who locked this system with a Cipher (null = not locked). Saved. */
+    private UUID owner;
+    /** Players who hacked the lock: they have access until the owner locks the system again. Saved. */
+    private final Set<UUID> access = new java.util.HashSet<>();
+
+    public UUID owner() {
+        return owner;
+    }
+
+    /** When it was locked (real time ms): hack progress from an older lock is thrown away. Saved. */
+    private long lockStamp;
+
+    public long lockStamp() {
+        return lockStamp;
+    }
+
+    public boolean isLocked() {
+        return owner != null;
+    }
+
+    public boolean hasAccess(UUID player) {
+        return access.contains(player);
+    }
+
+    /** Locks the system for this player. Everybody who had hacked it loses access. */
+    public void lock(UUID newOwner) {
+        owner = newOwner;
+        lockStamp = System.currentTimeMillis();
+        access.clear();
+        setChanged();
+    }
+
+    public void unlock() {
+        owner = null;
+        access.clear();
+        setChanged();
+    }
+
+    /** A successful hack: this player may use the system until it is locked again. */
+    public void grantAccess(UUID player) {
+        if (access.add(player)) {
+            setChanged();
+        }
+    }
+
+    public boolean autoRun() {
+        return autoRun;
+    }
+
+    public void setAutoRun(boolean value) {
+        if (autoRun != value) {
+            autoRun = value;
+            setChanged();
+        }
+    }
+
+    /** The chunk loaded: if the script was running when it saved or unloaded, start it again a moment later. */
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        if (autoRun && level != null && !level.isClientSide) {
+            ScriptManager.scheduleAutostart(GlobalPos.of(level.dimension(), worldPosition));
+        }
     }
 
     public Map<String, String> files() {
@@ -376,6 +445,24 @@ public class BrainBlockEntity extends BlockEntity {
         CompoundTag counterTag = new CompoundTag();
         counters.forEach(counterTag::putInt);
         tag.put("counters", counterTag);
+        tag.putBoolean("auto_run", autoRun);
+        if (owner != null) {
+            tag.putString("owner", owner.toString());
+        }
+        tag.putLong("lock_stamp", lockStamp);
+        ListTag accessTag = new ListTag();
+        for (UUID player : access) {
+            accessTag.add(StringTag.valueOf(player.toString()));
+        }
+        tag.put("access", accessTag);
+    }
+
+    private static UUID parseUuid(String text) {
+        try {
+            return text.isEmpty() ? null : UUID.fromString(text);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     @Override
@@ -408,6 +495,18 @@ public class BrainBlockEntity extends BlockEntity {
                 deviceIds.put(Long.parseLong(key), idTag.getString(key));
             } catch (NumberFormatException ignored) {
                 // Skip a corrupt entry.
+            }
+        }
+
+        autoRun = tag.getBoolean("auto_run");
+        owner = parseUuid(tag.getString("owner"));
+        lockStamp = tag.getLong("lock_stamp");
+        access.clear();
+        ListTag accessTag = tag.getList("access", Tag.TAG_STRING);
+        for (int i = 0; i < accessTag.size(); i++) {
+            UUID player = parseUuid(accessTag.getString(i));
+            if (player != null) {
+                access.add(player);
             }
         }
 

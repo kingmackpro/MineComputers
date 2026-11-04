@@ -19,6 +19,7 @@ import net.minecraft.core.GlobalPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -57,10 +58,18 @@ public final class ServerHandlers {
         Level level = player.level();
         BlockPos pos = action.laptop();
         if (!laptopUsable(player, level, pos)) {
+            // A remote laptop that went out of range (or was put away) gets told why; a placed laptop just stops.
+            if (level.isLoaded(pos) && level.getBlockState(pos).is(ModBlocks.REMOTE_GATEWAY.get())) {
+                notice(player, pos, RemoteAccess.refusal(player, level, pos), true);
+            }
             return;
         }
         BrainBlockEntity brain = NetworkScan.findBrain(level, pos);
         if (brain == null) {
+            return;
+        }
+        if (!CipherLock.canAccess(player, brain)) {
+            notice(player, pos, "This system is locked by a Cipher.", true);
             return;
         }
         GlobalPos key = GlobalPos.of(level.dimension(), brain.getBlockPos());
@@ -90,15 +99,8 @@ public final class ServerHandlers {
                 sendSnapshot(player, level, pos);
             }
             case LaptopAction.RUN -> {
-                Map<String, String> devices = new HashMap<>();
-                Map<String, GlobalPos> positions = new HashMap<>();
-                for (LaptopSnapshot.DeviceEntry device : NetworkScan.snapshot(level, pos, false).devices()) {
-                    devices.put(device.id(), device.type());
-                    positions.put(device.id(), GlobalPos.of(level.dimension(), new BlockPos(device.x(), device.y(), device.z())));
-                }
-                Map<String, String> mediaIds = new HashMap<>();
-                brain.media().forEach((mediaPath, info) -> mediaIds.put(mediaPath, info.id()));
-                BrainRuntime runtime = ScriptManager.run(key, new HashMap<>(brain.files()), devices, positions, mediaIds);
+                BrainRuntime runtime = startScript(level, pos, brain);
+                brain.setAutoRun(runtime != null); // a started script continues after a restart / when its chunk loads again
                 if (runtime == null) {
                     PacketDistributor.sendToPlayer(player, new ConsoleSync(pos, 0, false, List.of(new ConsoleLine(
                             BrainRuntime.BRAIN_TAG, "The JavaScript engine failed to load. See latest.log.", 2))));
@@ -107,6 +109,7 @@ public final class ServerHandlers {
                 }
             }
             case LaptopAction.STOP -> {
+                brain.setAutoRun(false);
                 ScriptManager.stop(key);
                 sendConsole(player, pos, key, -1);
             }
@@ -114,6 +117,24 @@ public final class ServerHandlers {
             default -> {
             }
         }
+    }
+
+    /**
+     * Starts the script of a Brain: scans the network from `scanFrom` (a laptop, a gateway or the Brain itself),
+     * gives the script its devices and media. Used by the Run button and by autostart. Server thread only.
+     * Returns null if the JavaScript engine could not be loaded.
+     */
+    public static BrainRuntime startScript(Level level, BlockPos scanFrom, BrainBlockEntity brain) {
+        GlobalPos key = GlobalPos.of(level.dimension(), brain.getBlockPos());
+        Map<String, String> devices = new HashMap<>();
+        Map<String, GlobalPos> positions = new HashMap<>();
+        for (LaptopSnapshot.DeviceEntry device : NetworkScan.snapshot(level, scanFrom, false).devices()) {
+            devices.put(device.id(), device.type());
+            positions.put(device.id(), GlobalPos.of(level.dimension(), new BlockPos(device.x(), device.y(), device.z())));
+        }
+        Map<String, String> mediaIds = new HashMap<>();
+        brain.media().forEach((mediaPath, info) -> mediaIds.put(mediaPath, info.id()));
+        return ScriptManager.run(key, new HashMap<>(brain.files()), devices, positions, mediaIds);
     }
 
     /** One chunk of a dragged-in file. Chunk 0 starts the upload; the last chunk stores the file. */
@@ -125,6 +146,9 @@ public final class ServerHandlers {
         Level level = player.level();
         BlockPos pos = upload.laptop();
         BrainBlockEntity brain = laptopUsable(player, level, pos) ? NetworkScan.findBrain(level, pos) : null;
+        if (brain != null && !CipherLock.canAccess(player, brain)) {
+            brain = null;
+        }
         if (brain == null) {
             UPLOADS.remove(id);
             return;
@@ -162,6 +186,7 @@ public final class ServerHandlers {
     /** A player who leaves loses an upload in progress. */
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         UPLOADS.remove(event.getEntity().getUUID());
+        HackManager.onLogout(event.getEntity().getUUID());
         MediaTransfer.onLogout(event.getEntity().getUUID());
     }
 
@@ -209,10 +234,22 @@ public final class ServerHandlers {
         }, server);
     }
 
-    private static boolean laptopUsable(ServerPlayer player, Level level, BlockPos pos) {
-        return level.isLoaded(pos)
-                && level.getBlockState(pos).is(ModBlocks.LAPTOP.get())
-                && player.distanceToSqr(Vec3.atCenterOf(pos)) <= MAX_DISTANCE_SQR;
+    /**
+     * The position the GUI talks about is either a placed Laptop (the player must be within 8 blocks) or a Remote
+     * Gateway (the player must hold a Remote Access laptop linked to it and be within 50 blocks, see RemoteAccess).
+     */
+    static boolean laptopUsable(ServerPlayer player, Level level, BlockPos pos) {
+        if (!level.isLoaded(pos)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(pos);
+        if (state.is(ModBlocks.LAPTOP.get())) {
+            return player.distanceToSqr(Vec3.atCenterOf(pos)) <= MAX_DISTANCE_SQR;
+        }
+        if (state.is(ModBlocks.REMOTE_GATEWAY.get())) {
+            return RemoteAccess.canUse(player, level, pos);
+        }
+        return false;
     }
 
     private static void notice(ServerPlayer player, BlockPos laptop, String text, boolean error) {
@@ -221,7 +258,10 @@ public final class ServerHandlers {
 
     private static void sendSnapshot(ServerPlayer player, Level level, BlockPos laptop) {
         // Always answer with the real state, so the GUI shows what the server actually has.
-        PacketDistributor.sendToPlayer(player, NetworkScan.snapshot(level, laptop, false));
+        LaptopSnapshot snapshot = CipherLock.snapshotFor(player, level, laptop, false);
+        if (snapshot != null) {
+            PacketDistributor.sendToPlayer(player, snapshot);
+        }
     }
 
     /** Sends the console unless the GUI already has this version of it. */

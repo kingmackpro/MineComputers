@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": ["TQT", "MRM"],
+  "key": {
+    "T": {"item": "create:electron_tube"},
+    "Q": {"item": "minecraft:quartz"},
+    "M": {"item": "create:precision_mechanism"},
+    "R": {"item": "minecraft:redstone_block"}
+  },
+  "result": {"id": "minecomputers:range_booster", "count": 1}
+}
