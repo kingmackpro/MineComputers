@@ -1,6 +1,4 @@
-# MineComputers: Spec (fresh start, v13, complete)
-
-Status: updated with Ralfs's answers. The limits and safety section (10) was approved by Ralfs.
+# MineComputers: Spec
 
 ## 1. Overview
 - Mod name: **MineComputers**
